@@ -71,7 +71,7 @@ bool start() {
 	return states.at(getState()) == "Running";
 }
 
-void readData(std::vector<double> data[], int gain_list[]) {
+void readData(std::vector<double> data[], int gain_list[], Graph graph) {
 	int data_packet[4] = { 0, 0, 0, 0 };
 	sadiRead();
 	//cout << "Read Value: " << read_vals.at(sadiRead()) << "\n";
@@ -84,11 +84,15 @@ void readData(std::vector<double> data[], int gain_list[]) {
 			data[i].push_back(voltage);
 		}
 	}
+
+	graph.AddData(Graph::Point(data[0].size(), data[0].back()));
 }
 
-void eventLoop(sf::RenderWindow window, Panel windowPanel) {
+void eventLoop(sf::RenderWindow& window, Panel windowPanel, Graph graph, int gain_list[]) {
 	sf::Color focused_color = sf::Color(0, 76, 135);
 	sf::Color unfocused_color = sf::Color(100, 100, 100);
+
+	std::vector<double> data[4] = { std::vector<double>(), std::vector<double>(), std::vector<double>(), std::vector<double>() };
 
 	while (window.isOpen()) {
 		sf::Event event;
@@ -102,6 +106,8 @@ void eventLoop(sf::RenderWindow window, Panel windowPanel) {
 		else {
 			windowPanel.SetBorderColor(unfocused_color);
 		}
+
+		readData(data, gain_list, graph);
 
 		window.clear();
 
@@ -131,20 +137,18 @@ int main() {
 	Graph graph(Drawable::Rectangle(10, 20, windowPanel.GetBounds().width - 20, windowPanel.GetBounds().height - 40));
 	graph.SetColor(sf::Color(50, 50, 50));
 	graph.SetBorderColor(sf::Color::Black);
-	graph.AddData(Graph::Point(1, 1));
 #pragma endregion
 
 	if (connectSadi() == 0) {
 		if (sadiReset()) {
-			std::vector<double> data[4] = { std::vector<double>(), std::vector<double>(), std::vector<double>(), std::vector<double>() };
-			int gain_list[4] = { gaines["GAIN_2X (5.12VPP)"], gaines["GAIN_2X (5.12VPP)"], gaines["GAIN_2X (5.12VPP)"], gaines["GAIN_2X (5.12VPP)"] };
+			int gain_list[4] = { gaines.at("GAIN_2X (5.12VPP)"), gaines.at("GAIN_2X (5.12VPP)"), gaines.at("GAIN_2X (5.12VPP)"), gaines.at("GAIN_2X (5.12VPP)")};
 			bool enable_list[4] = { 1, 1, 1, 1 };
 
 			bool initialized = initialize(gain_list, enable_list);
 
 			if (initialized) {
 				if (sadiStart()) {
-					readData(data, gain_list);
+					eventLoop(window, windowPanel, graph, gain_list);
 				}
 				else {
 					cout << "Failed to start.\n";
