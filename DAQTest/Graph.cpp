@@ -76,6 +76,7 @@ void Graph::SetData(std::vector<Point>& data) {
 void Graph::AddData(Point val) {
 	data.push_back(val);
 	ComputeDataVertexArray();
+	ComputeGridLines();
 }
 
 void Graph::SetFunctions(std::unordered_map<float(*)(float), sf::Color> functions) {

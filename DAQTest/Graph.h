@@ -36,10 +36,10 @@ public:
 	float GetYScale() const;
 	sf::Color GetColor() const;
 	sf::Color GetBorderColor() const;
-
+	float origin_x, origin_y;
 private:
 	double scale_x, scale_y;
-	float origin_x, origin_y;
+	//float origin_x, origin_y;
 	float prev_mouse_x, prev_mouse_y;
 
 	sf::Color background_color;
