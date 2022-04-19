@@ -29,8 +29,7 @@ void Graph::Tick() {
 	if (mouse_held && has_focus) {
 		origin_x += mouse_x - prev_mouse_x;
 		origin_y += mouse_y - prev_mouse_y;
-		ComputeGridLines();
-		ComputeDataVertexArray();
+		Update();
 	}
 
 	if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up) && this->has_focus) {
@@ -68,15 +67,22 @@ void Graph::SetMousePosition(float x, float y) {
 	mouse_y = y;
 }
 
-void Graph::SetData(std::vector<Point>& data) {
-	this->data = data;
-	ComputeDataVertexArray();
+void Graph::CreateDataSet(sf::Color color) {
+	data.push_back(std::make_pair(std::vector<Point>(), color));
 }
 
-void Graph::AddData(Point val) {
-	data.push_back(val);
+bool Graph::SetData(unsigned int index, std::vector<Point> data) {
+	if (index >= data.size()) return false;
+	this->data[index].first = data;
 	ComputeDataVertexArray();
-	ComputeGridLines();
+	return true;
+}
+
+bool Graph::AddData(unsigned int index, Point val) {
+	if (index >= data.size()) return false;
+	data[index].first.push_back(val);
+	ComputeDataVertexArray();
+	return true;
 }
 
 void Graph::SetFunctions(std::unordered_map<float(*)(float), sf::Color> functions) {
@@ -87,6 +93,11 @@ void Graph::SetFunctions(std::unordered_map<float(*)(float), sf::Color> function
 void Graph::AddFunction(float(*func)(float), sf::Color color) {
 	functions.emplace(func, color);
 	ComputeDataVertexArray();
+}
+
+void Graph::Update() {
+	ComputeDataVertexArray();
+	ComputeGridLines();
 }
 
 void Graph::SetColor(sf::Color color) {
@@ -108,14 +119,22 @@ void Graph::SetBorderColor(sf::Color color) {
 
 void Graph::SetXScale(float scale) {
 	scale_x = scale >= 0 ? scale : scale_x;
-	ComputeGridLines();
-	ComputeDataVertexArray();
+	Update();
 }
 
 void Graph::SetYScale(float scale) {
 	scale_y = scale >= 0 ? scale : scale_y;
-	ComputeGridLines();
-	ComputeDataVertexArray();
+	Update();
+}
+
+void Graph::SetOriginX(float num) {
+	origin_x = num;
+	Update();
+}
+
+void Graph::SetOriginY(float num) {
+	origin_y = num;
+	Update();
 }
 
 float Graph::GetXScale() const {
@@ -126,28 +145,32 @@ float Graph::GetYScale() const {
 	return scale_y;
 }
 
+float Graph::GetOriginX() const {
+	return origin_x;
+}
+
+float Graph::GetOriginY() const {
+	return origin_y;
+}
+
 void Graph::SetX(float num) {
 	Drawable::SetX(num);
-	ComputeGridLines();
-	ComputeDataVertexArray();
+	Update();
 }
 
 void Graph::SetY(float num) {
 	Drawable::SetY(num);
-	ComputeGridLines();
-	ComputeDataVertexArray();
+	Update();
 }
 
 void Graph::SetWidth(float num) {
 	Drawable::SetWidth(num);
-	ComputeGridLines();
-	ComputeDataVertexArray();
+	Update();
 }
 
 void Graph::SetHeight(float num) {
 	Drawable::SetHeight(num);
-	ComputeGridLines();
-	ComputeDataVertexArray();
+	Update();
 }
 
 sf::Color Graph::GetColor() const {
@@ -225,13 +248,17 @@ void Graph::ComputeDataVertexArray() {
 	data_to_draw.clear();
 
 	for (unsigned int i = 0; i < data.size(); i++) {
-		Point p = GraphToScreenCoordinates(data[i].x, data[i].y);
+		sf::Color point_color = data[i].second;
 
-		if (MouseInBounds(p.x, p.y)) {
-			//Create a 3x3 pixel square that represents the point to make it more visible.
-			for (float row = p.x - 1; row <= p.x + 1; row++) {
-				for (float col = p.y - 1; col <= p.y + 1; col++) {
-					data_to_draw.push_back(sf::Vertex(sf::Vector2f(row, col), sf::Color::Red));
+		for (Point p : data[i].first) {
+			Point point = GraphToScreenCoordinates(p.x, p.y);
+
+			if (MouseInBounds(point.x, point.y)) {
+				//Create a 3x3 pixel square that represents the point to make it more visible.
+				for (float row = point.x - 1; row <= point.x + 1; row++) {
+					for (float col = point.y - 1; col <= point.y + 1; col++) {
+						data_to_draw.push_back(sf::Vertex(sf::Vector2f(row, col), point_color));
+					}
 				}
 			}
 		}

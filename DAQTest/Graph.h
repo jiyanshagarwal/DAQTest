@@ -17,16 +17,20 @@ public:
 
 	void SetMousePosition(float x, float y) override;
 
-	void SetData(std::vector<Point>& data);
-	void AddData(Point val);
+	void CreateDataSet(sf::Color color);
+	bool SetData(unsigned int index, std::vector<Point> data);
+	bool AddData(unsigned int index, Point val);
 	void SetFunctions(std::unordered_map<float(*)(float), sf::Color> functions);
 	void AddFunction(float(*func)(float), sf::Color color);
+	void Update();
 
 	void SetColor(sf::Color color);
 	void SetBorderColor(sf::Color color);
 
 	void SetXScale(float scale);
 	void SetYScale(float scale);
+	void SetOriginX(float num);
+	void SetOriginY(float num);
 	void SetX(float num) override;
 	void SetY(float num) override;
 	void SetWidth(float num) override;
@@ -34,12 +38,14 @@ public:
 
 	float GetXScale() const;
 	float GetYScale() const;
+	float GetOriginX() const;
+	float GetOriginY() const;
 	sf::Color GetColor() const;
 	sf::Color GetBorderColor() const;
-	float origin_x, origin_y;
+	
 private:
 	double scale_x, scale_y;
-	//float origin_x, origin_y;
+	float origin_x, origin_y;
 	float prev_mouse_x, prev_mouse_y;
 
 	sf::Color background_color;
@@ -47,7 +53,7 @@ private:
 	sf::Color lighter_line_color;
 	sf::Color border_color;
 
-	std::vector<Point> data;
+	std::vector<std::pair<std::vector<Point>, sf::Color>> data;
 	std::unordered_map<float(*)(float), sf::Color> functions;
 
 	std::vector<sf::Vertex> grid_lines;

@@ -28,7 +28,8 @@ bool reset() {
 	using std::chrono::milliseconds;
 
 	auto start_time = high_resolution_clock::now();
-	while (SADI_LabVIEW::getSadiReady() == 0 && duration_cast<milliseconds>(high_resolution_clock::now() - start_time).count() < 5000) {
+	while (SADI_LabVIEW::getSadiReady() == 0 && duration_cast<milliseconds>(high_resolution_clock::now() - start_time).count() < 5000
+		&& read_vals.at(SADI_LabVIEW::sadiRead()) != "DATA_RECEIVED" && read_vals.at(SADI_LabVIEW::sadiRead()) != "NO_DATA_AVAILABLE") {
 		SADI_LabVIEW::sadiReset();
 	}
 
@@ -36,24 +37,44 @@ bool reset() {
 	return SADI_LabVIEW::getSadiReady() == 1 and (read_val == "DATA_RECEIVED" or read_val == "NO_DATA_AVAILABLE");
 }
 
-bool initialize(int gain_list[], bool enable_list[]) {
+bool initialize(int gain_list[], bool* enable_list) {
 	cout << "State: " << states.at(SADI_LabVIEW::getState()) << "\n";
-	cout << "Set Frequency: " << SADI_LabVIEW::sendSetTimerFreq(20000) << "\n";
+	cout << "Set Frequency: " << (int)(SADI_LabVIEW::sendSetTimerFreq(20000)) << "\n";
 
-	for (int i = 0; i < 4; i++) { SADI_LabVIEW::sendAdcInit(std::pow(2, i), gain_list[i]); }
+	for (int i = 0; i < 4; i++) { cout << (int)(SADI_LabVIEW::sendAdcInit(std::pow(2, i), gain_list[i])) << std::endl; }
 
+	/*cout << "DAC1 Enable: " << (int)(SADI_LabVIEW::sendDacEnable(1)) << std::endl;
+	cout << "DAC2 Enable: " << (int)(SADI_LabVIEW::sendDacEnable(2)) << std::endl;
+	SADI_LabVIEW::sendEnocderInit(0, 0, 0, 0, 6, 2048);
+	SADI_LabVIEW::sendEnocderInit(3, 0, 1, 0, 6, 2048);
+	SADI_LabVIEW::sendMotorEnable(0);
+	SADI_LabVIEW::sendServoEnable(0);
+
+	cout << "Digital Enable: " << (int)(SADI_LabVIEW::sendDigitalInEnable(0)) << std::endl;
+	SADI_LabVIEW::sendDigitalOutEnable(3072);*/
+
+	cout << "Digital Enable: " << (int)(SADI_LabVIEW::sendDigitalInEnable(0)) << std::endl;
 	cout << "State: " << states.at(SADI_LabVIEW::getState()) << "\n\n";
 	cout << "Read Value: " << read_vals.at(SADI_LabVIEW::sadiRead()) << "\n";
 
 	bool valid = false;
+	using std::chrono::high_resolution_clock;
+	using std::chrono::duration_cast;
+	using std::chrono::milliseconds;
 
-	for (int i = 0; i < 4; i++) {
-		enable_list[i] = SADI_LabVIEW::getAdcInfo_enable(i);
-		cout << "ADC" << i << " Enabled: " << enable_list[i] << "\n";
-		valid = valid || !enable_list[i];
-	}
+	auto start_time = high_resolution_clock::now();
+	
+	do {
+		valid = SADI_LabVIEW::getDigitalIn_enable();
 
-	return valid;
+		for (int i = 0; i < 4; i++) {
+			enable_list[i] = SADI_LabVIEW::getAdcInfo_enable(i);
+			//cout << "ADC" << i << " Enabled: " << enable_list[i] << "\n";
+			valid = valid && enable_list[i];
+		}
+	} while (!valid && duration_cast<milliseconds>(high_resolution_clock::now() - start_time).count() < 5000);
+
+	return true;
 }
 
 bool start() {
@@ -80,21 +101,22 @@ void readData(std::vector<double>* data, int gain_list[], Graph& graph) {
 	//cout << "New Data: " << has_data << "\n";
 
 	if (has_data) {
-		for (int i = 0; i < 4; i++) {
+		for (int i = 0; i < 7; i++) {
 			double voltage = (10.24 / 8191.0) * SADI_LabVIEW::getLowWord(data_packet[i]) / std::pow(2, (gain_list[i] - 1));
 			data[i].push_back(voltage);
 		}
+		for (int i = 4; i < 5; i++) {
+			graph.AddData(i, Graph::Point(data[i].size(), data[i].back()));
+		}
 
-		float graph_division = graph.GetBounds().width / 1000;
+		float graph_division = graph.GetXScale();
 		if (count > 1000) {
-			graph.origin_x -= graph_division;
+			graph.SetOriginX(graph.GetBounds().x - graph_division * data[0].size() + graph.GetBounds().width);
 		}
 
 		count++;
 
-		graph.AddData(Graph::Point(data[0].size(), data[0].back()));
-
-		for (int i = 0; i < 4; i++) { cout << data[i].back() << " "; }
+		for (int i = 0; i < 5; i++) { cout << data[i].back() << " "; }
 		cout << "\n";
 	}
 }
@@ -103,7 +125,11 @@ void eventLoop(sf::RenderWindow& window, Panel& windowPanel, Graph& graph, int g
 	sf::Color focused_color = sf::Color(0, 76, 135);
 	sf::Color unfocused_color = sf::Color(100, 100, 100);
 
-	std::vector<double> data[4] = { std::vector<double>(), std::vector<double>(), std::vector<double>(), std::vector<double>() };
+	std::vector<double> data[7];
+
+	/*while (true) {
+		readData(data, gain_list, graph);
+	}*/
 
 	while (window.isOpen()) {
 		sf::Event event;
@@ -154,12 +180,15 @@ int main() {
 	graph.SetBorderColor(sf::Color::Black);
 	graph.SetXScale(graph.GetBounds().width / 1000);
 	graph.SetYScale(0.8 * graph.GetBounds().height / 3.5);
-	graph.origin_x = graph.GetBounds().x;
-	graph.origin_y = graph.GetBounds().y + graph.GetBounds().height;
+	graph.SetOriginX(graph.GetBounds().x);
+	graph.SetOriginY(graph.GetBounds().y + graph.GetBounds().height);
+
+	graph.CreateDataSet(sf::Color::Black);
+
 	windowPanel.AddObject(&graph, 1);
 #pragma endregion
 
-	if (SADI_LabVIEW::connectSadi() == 0) {
+	if (read_vals.at(SADI_LabVIEW::connectSadi()) == "SADI_RESET (FT_OK)") {
 		if (reset()) {
 			int gain_list[4] = { gaines.at("GAIN_2X (5.12VPP)"), gaines.at("GAIN_2X (5.12VPP)"), gaines.at("GAIN_2X (5.12VPP)"), gaines.at("GAIN_2X (5.12VPP)")};
 			bool enable_list[4] = { 1, 1, 1, 1 };
@@ -186,6 +215,9 @@ int main() {
 		cout << "Failed to connect.\n";
 	}
 
-	SADI_LabVIEW::sadiStop();
+	if (states.at(SADI_LabVIEW::getState()) == "Running") {
+		SADI_LabVIEW::sadiStop();
+	}
+
 	cout << "Sadi Disconnected: " << (SADI_LabVIEW::disconnectSadi() == 0 ? "Yes" : "No") << std::endl;
 }
